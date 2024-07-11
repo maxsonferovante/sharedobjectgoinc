@@ -57,7 +57,11 @@ func processCsv(csv, selectedColumns, rowFilterDefinitions *C.char) {
 		return
 	}
 
-	filteredMatrix := builders.BuilderFilteredMatrix(matrix, goRowFilterDefinitions)
+	filteredMatrix, err := builders.BuilderFilteredMatrix(matrix, goRowFilterDefinitions)
+	if err != nil {
+		os.Stdout.WriteString(err.Error())
+		return
+	}
 
 	selectedMatrix := builders.BuilderSelectedMatrix(filteredMatrix, goSelectedColumns)
 	builders.BuilderApreciation(selectedMatrix)
@@ -67,27 +71,41 @@ func processCsv(csv, selectedColumns, rowFilterDefinitions *C.char) {
 //export processCsvFile
 func processCsvFile(csvFilePath, selectedColumns, rowFilterDefinitions *C.char) {
 
+	mtx.Lock()
+	defer mtx.Unlock()
+
 	goCsv := C.GoString(csvFilePath)
+	goSelectedColumns := C.GoString(selectedColumns)
+	goRowFilterDefinitions := C.GoString(rowFilterDefinitions)
 
 	records := loadFile(goCsv)
 
-	csv := C.CString(records)
+	valitations.ValidateCSV(records)
 
-	processCsv(csv, selectedColumns, rowFilterDefinitions)
+	matrix := builders.BuilderMatrix(records)
+	err, _ := valitations.ValidationSelectedColumns(matrix, goSelectedColumns)
+	if err != nil {
+		os.Stdout.WriteString(err.Error())
+		return
+	}
+
+	err, _ = valitations.ValidationFilterDefinitions(matrix, goRowFilterDefinitions)
+	if err != nil {
+		os.Stdout.WriteString(err.Error())
+		return
+	}
+
+	filteredMatrix, err := builders.BuilderFilteredMatrix(matrix, goRowFilterDefinitions)
+	if err != nil {
+		os.Stdout.WriteString(err.Error())
+		return
+	}
+
+	selectedMatrix := builders.BuilderSelectedMatrix(filteredMatrix, goSelectedColumns)
+	builders.BuilderApreciation(selectedMatrix)
 }
 
 func main() {
 	// This is necessary to build the shared library
 	// go build -o libcsv.so -buildmode=c-shared main.go
 }
-
-/* csv := "header1,header2,header3\n1,2,3\n4,5,6\n7,8,9"
-processCsv(csv, "header1,header3", "header1>1\nheader3<8")
-// output
-// header1,header3
-// 4,6
-
-// processCsv(csv, "header1,header3", "header1=4\nheader2>3")
-// */
-// filePath := "data.csv"
-// processCsvFile(filePath, "col1,col3,col4", "col1>l1c1\ncol3>l2c3")
