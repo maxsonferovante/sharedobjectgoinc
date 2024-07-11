@@ -8,10 +8,7 @@ import (
 	"libcsv/pkg/constants"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
-
-	"github.com/Knetic/govaluate"
 )
 
 func BuilderMatrix(csv string) map[string][]string {
@@ -67,14 +64,14 @@ func BuilderSelectedMatrix(matrix map[string][]string, selectedColumns string) m
 	return selectedMatrix
 }
 
-func BuilderFilteredMatrix(matrix map[string][]string, rowFilterDefinitions string) map[string][]string {
+func BuilderFilteredMatrix(matrix map[string][]string, rowFilterDefinitions string) (map[string][]string, error) {
 
 	expressions, err := BuilderFilters(rowFilterDefinitions)
 
 	if err != nil {
 		message := fmt.Sprintf("Error: %s", err)
 		err := errors.New(message)
-		panic(err)
+		return nil, err
 	}
 
 	maxtrixFiltered := make(map[string][]string)
@@ -83,29 +80,10 @@ func BuilderFilteredMatrix(matrix map[string][]string, rowFilterDefinitions stri
 		for _, expression := range expressions {
 			value := matrix[expression[0]][i]
 
-			valueInt, err := strconv.Atoi(value)
-
-			if err != nil {
-				message := fmt.Sprintf("Error: %s", err)
-				err := errors.New(message)
-				panic(err)
-			}
-			paramenters := map[string]interface{}{
-				expression[0]: valueInt,
-			}
-
-			evaluableExpression, _ := govaluate.NewEvaluableExpression(expression[1])
-
-			result, err := evaluableExpression.Evaluate(paramenters)
-
-			if err != nil {
-				panic(err)
-			}
-			if result == false {
+			if !applyOperation(expression[2], value, expression[1]) {
 				validRow = false
 				break
 			}
-
 		}
 		if validRow {
 			for column, values := range matrix {
@@ -116,11 +94,11 @@ func BuilderFilteredMatrix(matrix map[string][]string, rowFilterDefinitions stri
 			}
 		}
 	}
-	return maxtrixFiltered
+	return maxtrixFiltered, nil
 }
 
-func BuilderFilters(rowFilterDefinitions string) ([][2]string, error) {
-	var expressions [][2]string
+func BuilderFilters(rowFilterDefinitions string) ([][3]string, error) {
+	var expressions [][3]string
 
 	filtersDefinitions := strings.Split(rowFilterDefinitions, "\n")
 
@@ -140,7 +118,7 @@ func BuilderFilters(rowFilterDefinitions string) ([][2]string, error) {
 					operator = "=="
 				}
 
-				expression := [2]string{column, fmt.Sprintf("%s%s%s", column, operator, value)}
+				expression := [3]string{column, fmt.Sprintf("%s%s%s", column, operator, value), operator}
 				expressions = append(expressions, expression)
 				validExpression = true
 				break
@@ -153,20 +131,53 @@ func BuilderFilters(rowFilterDefinitions string) ([][2]string, error) {
 	return expressions, nil
 }
 func BuilderApreciation(matrix map[string][]string) {
+
 	// Ordena as chaves do mapa
 	headers := make([]string, 0, len(matrix))
 	for header := range matrix {
 		headers = append(headers, header)
 	}
 	sort.Strings(headers)
-
-	// Prepara e imprime as linhas de dados
-	rows := make([]string, len(headers))
-	for i, header := range headers {
-		rows[i] = strings.Join(matrix[header], ",")
+	os.Stdout.WriteString("\n")
+	os.Stdout.WriteString(strings.Join(headers, ",") + "\n")
+	for i := 0; i < len(matrix[headers[0]]); i++ {
+		for _, header := range headers {
+			os.Stdout.WriteString(matrix[header][i] + ",")
+		}
+		os.Stdout.WriteString("\n")
 	}
+	os.Stdout.WriteString("\n")
+}
 
-	processed := strings.Join(headers, ",") + "\n" + strings.Join(rows, ",") + "\n"
-	os.Stdout.WriteString(processed)
-	os.Stdout.Sync()
+func contains(values []string, value string) bool {
+	for _, v := range values {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
+func applyOperation(operator, value1, value2 string) bool {
+	switch operator {
+	case ">":
+		value2 = strings.Split(value2, ">")[1]
+		return value1 > value2
+	case "<":
+		value2 = strings.Split(value2, "<")[1]
+		return value1 < value2
+	case ">=":
+		value2 = strings.Split(value2, ">=")[1]
+		return value1 >= value2
+	case "<=":
+		value2 = strings.Split(value2, "<=")[1]
+		return value1 <= value2
+	case "==":
+		value2 = strings.Split(value2, "==")[1]
+		return value1 == value2
+	case "!=":
+		value2 = strings.Split(value2, "!=")[1]
+		return value1 != value2
+	}
+	return false
 }
