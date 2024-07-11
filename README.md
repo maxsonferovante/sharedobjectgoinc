@@ -1,5 +1,14 @@
 # Processador de CSV
 
+## Execução de teste
+
+```bash
+docker build -t image_csv . 
+```
+
+```bash
+docker run --rm -it image_csv
+```
 ## Objetivo
 
 Implementa uma biblioteca _shared object_ (.so) que processe arquivos CSV, aplicando filtros e selecionando colunas conforme especificado. A solução deve ser capaz de integrar com a interface definida em C abaixo.
